@@ -1,3 +1,17 @@
+"""
+app.py
+
+Contents:
+1. Configuration
+2. Create a helper function
+3. Define the main call handler
+4. Write the transcription route
+
+This code is a Flask-based application that handles incoming calls using Twilio's Voice API, with functionality for 
+forwarding calls during work hours and taking voicemail outside of work hours. The app can also handle multiple languages 
+for voicemail prompts and transcribe voicemails. The app supports multiple languages by using a country-specific greeting dictionary.
+"""
+
 from flask import Flask, request, Response
 from twilio.twiml.voice_response import VoiceResponse
 from datetime import datetime, timedelta
@@ -5,7 +19,12 @@ import pytz
 
 app = Flask(__name__)
 
-# 2. Configuration
+"""
+1. Configuration
+Write a dictionary that stores different language responses for after-hours calls. The default greeting is in English, but if the call originates 
+from Germany ("DE"), the app uses a German greeting.
+
+"""
 GREETINGS = {
     "_default": {
         "text": "Hi there! You are calling after my work hours. Please leave a message after the beep.",
@@ -26,22 +45,28 @@ DEFAULT_WORK_WEEK_END = 5  # Friday
 DEFAULT_WORK_HOUR_START = 8  # 8:00 AM
 DEFAULT_WORK_HOUR_END = 18  # 6:59 PM
 
-# 2. Helper Function
+"""
+2. Create a helper function
+This function ensures that any incoming string data can be safely converted to an integer. If it fails, it returns the provided default value.
+"""
 def parse_integer(value, default):
     try:
         return int(value)
     except (ValueError, TypeError):
         return default
     
-@app.route('/')
-def hello():
-    return "ayooo"
+"""
+3. Define the main call handler
+This is the main function that handles the incoming phone call logic.
+If it's within working hours, the call is forwarded to the specified phone number using response.dial().
+If the call is outside working hours, the system plays a recorded message using response.say() and prompts the caller to leave a voicemail using 
+response.record(). The voicemail is limited to 120 seconds, and transcription is enabled with a callback to the /transcription endpoint.
 
+"""
 @app.route("/handle_call", methods=["POST"])
 def handle_call():
-    # 3. Main Handler
     # Parse environment variables and get the work hours and timezone
-    phone_number_to_forward_to = "+19145296977"  # Replace with your Twilio phone number
+    phone_number_to_forward_to = "+19143601212"  # Replace with your Twilio phone number
     timezone_offset = parse_integer(request.form.get("TIMEZONE_OFFSET"), DEFAULT_UTC_OFFSET)
     work_week = {
         "start": parse_integer(request.form.get("WORK_WEEK_START"), DEFAULT_WORK_WEEK_START),
@@ -66,7 +91,6 @@ def handle_call():
     is_working_day = work_week["start"] <= current_day <= work_week["end"]
     is_working_hour = work_hour["start"] <= current_hour <= work_hour["end"]
 
-    # Create a new TwiML response
     response = VoiceResponse()
 
     if is_working_day and is_working_hour:
@@ -85,6 +109,11 @@ def handle_call():
 
     return Response(str(response), mimetype="application/xml")
 
+"""
+4. Write the transcription route
+When a voicemail is recorded, Twilio sends the transcription to this endpoint. The transcription text is printed out, 
+and the route responds with an empty 204 status (no content), indicating that the transcription was received successfully.
+"""
 @app.route("/transcription", methods=["POST"])
 def transcription():
     # Handle the transcription of the voicemail
